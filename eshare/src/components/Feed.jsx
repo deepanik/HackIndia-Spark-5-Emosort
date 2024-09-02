@@ -15,6 +15,7 @@ const Feed = () => {
   const { isConnected, account } = useMetaMask();
 
   const CONTRACT_ADDRESS = '0x1564FfA1Ccb8427D7dFd6e5DD27AA92C13dcA161'; // Replace with your actual contract address
+  const CONTRACT_ABI = [ /* Your contract ABI here */ ];
 
   useEffect(() => {
     const fetchFiles = async () => {
@@ -39,6 +40,7 @@ const Feed = () => {
     }
 
     const web3 = new Web3(Web3.givenProvider);
+    const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
     const priceInWei = web3.utils.toWei(file.price.toString(), 'ether');
 
     try {
@@ -81,11 +83,11 @@ const Feed = () => {
       {files.length > 0 ? (
         files.map((file) => (
           <div key={file._id} className="file-container">
-            <h3 className="file-name">{file.name}</h3>
+            <h3 className="file-name">{file.fileName}</h3>
             <p className="file-description">{file.description}</p>
             <p className="file-details"><strong>Date of Upload:</strong> {new Date(file.uploadDate).toLocaleDateString()}</p>
             <p className="file-details"><strong>Price:</strong> ${file.price}</p>
-            <p className="file-details"><strong>Author Name:</strong> {file.authorName}</p>
+            <p className="file-details"><strong>Author Name:</strong> {file.author}</p>
             <button 
               onClick={() => handlePayment(file)} 
               className="buy-button"

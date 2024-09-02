@@ -3,6 +3,10 @@ import Web3 from 'web3';
 import axios from 'axios';
 import { useMetaMask } from '../hooks/useMetaMask';
 
+// Replace this with your NFT contract address and ABI
+const CONTRACT_ADDRESS = '0x1564FfA1Ccb8427D7dFd6e5DD27AA92C13dcA161'; 
+const CONTRACT_ABI = [ /* Your contract ABI here */ ];
+
 const UploadFile = () => {
   const [file, setFile] = useState(null);
   const [fileName, setFileName] = useState('');
@@ -13,8 +17,10 @@ const UploadFile = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [transactionHash, setTransactionHash] = useState('');
   const [error, setError] = useState('');
-  
+
   const { isConnected, account, connect, disconnect } = useMetaMask();
+  const web3 = new Web3(Web3.givenProvider);
+  const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
 
   const handleFileUpload = async () => {
     if (!isConnected) {
@@ -38,15 +44,9 @@ const UploadFile = () => {
       return;
     }
 
-    const web3 = new Web3(Web3.givenProvider);
-
-    // Convert price to Wei (assuming you are using Ether)
     const priceInWei = web3.utils.toWei(price, 'ether');
 
-    // Hardcoded contract address
-    const contractAddress = '0x1564FfA1Ccb8427D7dFd6e5DD27AA92C13dcA161'; 
-
-    // Create form data
+    // Create form data for file upload
     const formData = new FormData();
     formData.append('file', file);
     formData.append('fileName', fileName);
@@ -58,27 +58,7 @@ const UploadFile = () => {
     try {
       setLoading(true);
 
-      // Estimate gas
-      const gasEstimate = await web3.eth.estimateGas({
-        from: account,
-        to: contractAddress,
-        value: priceInWei,
-      });
-
-      // First, send a transaction to pay the fee
-      const tx = await web3.eth.sendTransaction({
-        from: account,
-        to: contractAddress,
-        value: priceInWei,
-        gas: gasEstimate,
-      });
-
-      setTransactionHash(tx.transactionHash);
-      
-      // Show transaction status
-      console.log('Transaction successful:', tx.transactionHash);
-
-      // Proceed to upload the file
+      // Upload file to server (assuming server handles file storage and returns a file URL)
       const uploadResponse = await axios.post('http://localhost:3001/api/upload', formData, {
         onUploadProgress: (progressEvent) => {
           const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -86,10 +66,18 @@ const UploadFile = () => {
         }
       });
 
-      console.log('File uploaded successfully', uploadResponse.data);
-      alert('File uploaded successfully!');
+      // Extract file URL from response
+      const fileUrl = uploadResponse.data.fileUrl;
+
+      // Mint NFT with file URL
+      const tx = await contract.methods.mintNFT(fileUrl, priceInWei, description).send({ from: account });
+
+      setTransactionHash(tx.transactionHash);
+
+      console.log('NFT Minted successfully:', tx.transactionHash);
+      alert('File uploaded and NFT minted successfully!');
     } catch (error) {
-      console.error('Error uploading file or processing payment', error);
+      console.error('Error uploading file or minting NFT', error);
       setError(`An error occurred: ${error.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
