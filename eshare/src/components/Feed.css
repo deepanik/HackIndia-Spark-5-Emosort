@@ -1,0 +1,52 @@
+.feed-container {
+    padding: 20px;
+  }
+  
+  .file-container {
+    border: 1px solid #b3f34d;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    background-color: #84e2a8;
+  }
+  
+  .file-name {
+    margin: 0;
+    font-size: 1.5em;
+    color: #333;
+  }
+  
+  .file-description {
+    font-style: italic;
+    color: #666;
+  }
+  
+  .file-details {
+    margin: 5px 0;
+  }
+  
+  .buy-button {
+    background-color: #28a745;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .buy-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+  }
+  
+  .download-link {
+    color: #007bff;
+    text-decoration: none;
+    margin-top: 10px;
+    display: inline-block;
+  }
+  
+  .error-message {
+    color: #dc3545;
+  }
+  
