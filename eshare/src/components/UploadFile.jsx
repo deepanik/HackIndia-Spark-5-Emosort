@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import Web3 from 'web3';
 import axios from 'axios';
+import Web3 from 'web3';
 import { useMetaMask } from '../hooks/useMetaMask';
 
-// Replace this with your NFT contract address and ABI
-const CONTRACT_ADDRESS = '0x1564FfA1Ccb8427D7dFd6e5DD27AA92C13dcA161'; 
-const CONTRACT_ABI = [ /* Your contract ABI here */ ];
+// Set up Web3 instance
+const web3 = new Web3(Web3.givenProvider);
+
+// Constants
+const TRANSACTION_FEE_IN_USD = 0.01;
+// const GAS_LIMIT = 40000;
 
 const UploadFile = () => {
   const [file, setFile] = useState(null);
@@ -13,91 +16,170 @@ const UploadFile = () => {
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [author, setAuthor] = useState('');
+  const [binanceId, setBinanceId] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [transactionHash, setTransactionHash] = useState('');
   const [error, setError] = useState('');
 
-  const { isConnected, account, connect, disconnect } = useMetaMask();
-  const web3 = new Web3(Web3.givenProvider);
-  const contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+  const { isConnected, account, connect } = useMetaMask();
 
-  const handleFileUpload = async () => {
+  const handlePayment = async () => {
     if (!isConnected) {
-      alert('Please connect MetaMask first.');
-      return;
+      throw new Error('MetaMask is not connected.');
     }
+  
+    const feeInWei = web3.utils.toWei(String(TRANSACTION_FEE_IN_USD), 'ether');
     
-    if (!file || !fileName || !price || !description || !author) {
-      alert('All fields are required.');
-      return;
+    try {
+      // Estimate gas for the transaction
+      const gasEstimate = await web3.eth.estimateGas({
+        from: account,
+        to: '0x1564FfA1Ccb8427D7dFd6e5DD27AA92C13dcA161', // Replace with your payment address
+        value: feeInWei,
+      });
+  
+      const tx = await web3.eth.sendTransaction({
+        from: account,
+        to: '0x37E551eD0C989FE65d08651DB7181a938Be0A613',
+        value: feeInWei,
+        gas: gasEstimate, // Use estimated gas
+      });
+  
+      setTransactionHash(tx.transactionHash);
+      return tx.transactionHash;
+    } catch (error) {
+      throw new Error(`Payment error: ${error.message}`);
     }
+  };
+  
 
-    if (file.size > 5 * 1024 * 1024) { // Check file size (5 MB limit)
-      alert('File size should not exceed 5 MB.');
-      return;
-    }
-
-    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Invalid file type. Only JPEG, PNG, and PDF files are allowed.');
-      return;
-    }
-
-    const priceInWei = web3.utils.toWei(price, 'ether');
-
-    // Create form data for file upload
+  const handleFileUpload = async (transactionHash) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('fileName', fileName);
     formData.append('price', price);
     formData.append('description', description);
     formData.append('author', author);
-    formData.append('account', account);
+    formData.append('binanceId', binanceId);
 
     try {
-      setLoading(true);
-
-      // Upload file to server (assuming server handles file storage and returns a file URL)
       const uploadResponse = await axios.post('http://localhost:3001/api/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(percent);
-        }
+        },
       });
 
-      // Extract file URL from response
-      const fileUrl = uploadResponse.data.fileUrl;
-
-      // Mint NFT with file URL
-      const tx = await contract.methods.mintNFT(fileUrl, priceInWei, description).send({ from: account });
-
-      setTransactionHash(tx.transactionHash);
-
-      console.log('NFT Minted successfully:', tx.transactionHash);
-      alert('File uploaded and NFT minted successfully!');
+      return uploadResponse.data;
     } catch (error) {
-      console.error('Error uploading file or minting NFT', error);
-      setError(`An error occurred: ${error.message || 'Please try again.'}`);
+      throw new Error(`File upload error: ${error.message}`);
+    }
+  };
+
+  const handlePaymentAndUpload = async () => {
+    if (!isConnected) {
+      alert('Please connect MetaMask first.');
+      return;
+    }
+
+    if (!file || !fileName || !price || !description || !author || !binanceId) {
+      alert('All fields are required.');
+      return;
+    }
+
+    if (isNaN(price) || parseFloat(price) <= 0) {
+      alert('Price should be a positive number.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      
+      const txHash = await handlePayment();
+      console.log('Payment successful:', txHash);
+
+      const uploadResponse = await handleFileUpload(txHash);
+      console.log('File and metadata uploaded successfully:', uploadResponse);
+
+      alert('File and metadata uploaded successfully!');
+      setTransactionHash('');
+      setUploadProgress(0);
+    } catch (error) {
+      setError(error.message);
+      console.error('Error during payment or file upload:', error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-4">
-      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-      <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="File Name" />
-      <input type="text" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (ETH)" />
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description"></textarea>
-      <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="Author Name" />
-      <button onClick={handleFileUpload} className="bg-green-500 text-white p-2 rounded" disabled={loading}>
-        {loading ? `Uploading... ${uploadProgress}%` : 'Upload File'}
+    <div className="max-w-lg mx-auto p-6 bg-white rounded-xl shadow-md space-y-4">
+      <h2 className="text-2xl font-bold text-gray-800">Upload and Pay Fee</h2>
+      <button
+        onClick={connect}
+        className="w-full py-2 px-4 text-white bg-blue-600 rounded-md hover:bg-blue-700"
+      >
+        {isConnected ? `Connected: ${account}` : 'Connect MetaMask'}
       </button>
-      {!isConnected && <button onClick={connect} className="bg-blue-500 text-white p-2 rounded">Connect MetaMask</button>}
-      {isConnected && <button onClick={disconnect} className="bg-red-500 text-white p-2 rounded">Disconnect MetaMask</button>}
-      {transactionHash && <p>Transaction Hash: <a href={`https://etherscan.io/tx/${transactionHash}`} target="_blank" rel="noopener noreferrer">{transactionHash}</a></p>}
-      {error && <p className="text-red-500">{error}</p>}
+      <div className="space-y-4">
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files[0])}
+          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+        />
+        <input
+          type="text"
+          value={fileName}
+          onChange={(e) => setFileName(e.target.value)}
+          placeholder="File Name"
+          className="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <input
+          type="text"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          placeholder="Price (ETH)"
+          className="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Description"
+          className="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <input
+          type="text"
+          value={author}
+          onChange={(e) => setAuthor(e.target.value)}
+          placeholder="Author Name"
+          className="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <input
+          type="text"
+          value={binanceId}
+          onChange={(e) => setBinanceId(e.target.value)}
+          placeholder="Binance ID"
+          className="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button
+          onClick={handlePaymentAndUpload}
+          className={`w-full py-2 px-4 text-white rounded-md transition-colors ${loading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+          disabled={loading}
+        >
+          {loading ? `Uploading... ${uploadProgress}%` : 'Upload and Pay Fee'}
+        </button>
+      </div>
+      {transactionHash && 
+        <p className="text-green-600 mt-4">
+          Transaction Hash: <a href={`https://etherscan.io/tx/${transactionHash}`} target="_blank" rel="noopener noreferrer">{transactionHash}</a>
+        </p>}
+      {error && 
+        <p className="text-red-600 mt-4">
+          {error}
+        </p>}
     </div>
   );
 };

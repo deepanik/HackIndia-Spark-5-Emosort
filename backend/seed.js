@@ -1,54 +1,50 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
-const File = require('./models/File'); // Adjust the path if necessary
+const File = require('./models/File');
+const Transaction = require('./models/Transaction'); // Path to your Transaction model
 
-const MONGO_URI = 'mongodb+srv://xx:xx@cluster0.o8emf.mongodb.net/'; // Replace with your MongoDB connection string
+async function seedDatabase() {
+  try {
+    // Check if MONGO_URI is available
+    if (!process.env.MONGO_URI) {
+      throw new Error('MONGO_URI environment variable is not set.');
+    }
 
-mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(async () => {
-    console.log('MongoDB connected');
-    
-    // Remove existing files
-    await File.deleteMany({});
+    // Connect to MongoDB
+    await mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
-    // Create dummy files
-    const files = [
-      {
-        filePath: 'path/to/file1.pdf',
-        fileName: 'File1.pdf',
-        description: 'Description for File1',
-        price: 0.1,
-        author: 'Author1',
-        size: '1MB',
-        downloadUrl: 'http://example.com/file1.pdf',
-        account: '0xYourAccountAddress1',
-      },
-      {
-        filePath: 'path/to/file2.jpeg',
-        fileName: 'File2.jpeg',
-        description: 'Description for File2',
-        price: 0.2,
-        author: 'Author2',
-        size: '2MB',
-        downloadUrl: 'http://example.com/file2.jpeg',
-        account: '0xYourAccountAddress2',
-      },
-      {
-        filePath: 'path/to/file3.png',
-        fileName: 'File3.png',
-        description: 'Description for File3',
-        price: 0.15,
-        author: 'Author3',
-        size: '1.5MB',
-        downloadUrl: 'http://example.com/file3.png',
-        account: '0xYourAccountAddress3',
-      },
-    ];
+    // Create some sample files and transactions
+    const file1 = new File({
+      fileName: 'sampleFile1.txt',
+      size: 1234,
+      description: 'Sample file 1',
+      price: 0.1,
+      author: 'Author1',
+      account: '0x1234567890abcdef1234567890abcdef12345678',
+      encryptionCode: 'abc123',
+      filePath: '/path/to/file1',
+      uploadDate: new Date(),
+      transactionHash: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
+      downloadUrl: 'http://example.com/download/file1'
+    });
 
-    await File.insertMany(files);
-    console.log('Dummy data inserted');
-    
+    await file1.save();
+
+    const transaction = new Transaction({
+      fileId: file1._id,
+      account: '0xabcdefabcdefabcdefabcdefabcdefabcdef12345678',
+      transactionHash: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdef',
+      price: 0.1
+    });
+
+    await transaction.save();
+
+    console.log('Database seeded successfully');
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  } finally {
     mongoose.connection.close();
-  })
-  .catch(err => {
-    console.error('Error connecting to MongoDB:', err);
-  });
+  }
+}
+
+seedDatabase();
