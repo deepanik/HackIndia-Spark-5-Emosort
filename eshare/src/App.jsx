@@ -9,6 +9,11 @@ import Navbar from './components/Navbar';
 import Transaction from './components/Transaction';
 import { getFiles } from './api';
 
+//
+import BackgroundEffect from './components/BackgroundEffect';
+import Footer from './components/Footer';
+import home from './components/home';
+
 const App = () => {
   const [files, setFiles] = useState([]);
   const [account, setAccount] = useState(null);
@@ -45,6 +50,9 @@ const App = () => {
   return (
     <div>
       <Navbar />
+      <BackgroundEffect />
+      <Home/>
+      
       <div className="container mx-auto p-4">
         <Routes>
           <Route path="/feed" element={<Feed files={files} />} />
@@ -55,7 +63,10 @@ const App = () => {
           <Route path="/transaction" element={<Transaction />} />
         </Routes>
       </div>
+      <Footer/>      
+      
     </div>
+    
   );
 };
 
